@@ -20,11 +20,11 @@ RUN apt-get update \
 COPY runtime/lib/librknnrt.so /usr/lib/librknnrt.so
 
 COPY piper/requirements.txt /app/requirements.txt
-COPY runtime/wheels/rknn_toolkit_lite2-2.3.2-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl /tmp/rknn_toolkit_lite2.whl
+COPY runtime/wheels/rknn_toolkit_lite2-2.3.2-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl /tmp/rknn_toolkit_lite2-2.3.2-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl
 RUN python -m pip install --upgrade pip \
-    && python -m pip install /tmp/rknn_toolkit_lite2.whl \
+    && python -m pip install /tmp/rknn_toolkit_lite2-2.3.2-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl \
     && python -m pip install -r /app/requirements.txt \
-    && rm -f /tmp/rknn_toolkit_lite2.whl
+    && rm -f /tmp/rknn_toolkit_lite2-2.3.2-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl
 
 COPY piper/wyoming_service.py /app/wyoming_service.py
 COPY piper/model /app/model
