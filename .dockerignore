@@ -1,0 +1,8 @@
+**/__pycache__/
+**/*.py[cod]
+.git/
+.github/
+.agents/
+.codex/
+dist/
+homeassistant/

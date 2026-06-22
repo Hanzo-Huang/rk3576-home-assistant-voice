@@ -1,0 +1,51 @@
+services:
+  whisper:
+    image: ghcr.io/hanzo-huang/wyoming-whisper-rk3576:latest
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - "10300:10300"
+
+  piper:
+    image: ghcr.io/hanzo-huang/wyoming-piper-rk3576:latest
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - "10200:10200"
+
+  openwakeword:
+    image: rhasspy/wyoming-openwakeword
+    restart: unless-stopped
+    ports:
+      - "10400:10400"
+    command:
+      - --uri
+      - tcp://0.0.0.0:10400
+      - --preload-model
+      - ok_nabu
+
+  llm:
+    image: ghcr.io/hanzo-huang/rkllm-docker/qwen2.5-1.5b-instruct:w4a16-rk3576
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - "8001:8001"
+    volumes:
+      - /dev:/dev
+
+  # Optional: omit this service when Home Assistant runs elsewhere.
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    profiles: [homeassistant]
+    restart: unless-stopped
+    privileged: true
+    network_mode: host
+    volumes:
+      - ./homeassistant/config:/config
+      - /etc/localtime:/etc/localtime:ro
+      - /run/dbus:/run/dbus:ro
+    depends_on:
+      - whisper
+      - piper
+      - openwakeword
+      - llm

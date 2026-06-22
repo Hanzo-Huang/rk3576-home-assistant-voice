@@ -1,0 +1,132 @@
+name: Build Wyoming images
+
+on:
+  push:
+    branches: [main, master]
+    tags: ["v*"]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      model_release:
+        description: Release tag containing the model bundle
+        required: true
+        default: models-v1
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: build-images-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MODEL_RELEASE: ${{ inputs.model_release || 'models-v1' }}
+  WHISPER_MODELS: whisper-rk3576-models.tar.gz
+  PIPER_MODELS: piper-rk3576-models.tar.gz
+  WHISPER_IMAGE: ghcr.io/hanzo-huang/wyoming-whisper-rk3576
+  PIPER_IMAGE: ghcr.io/hanzo-huang/wyoming-piper-rk3576
+
+jobs:
+  build:
+    name: Build ARM64 images
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download model archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$MODEL_RELEASE" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "$WHISPER_MODELS" \
+            --pattern "$PIPER_MODELS" \
+            --pattern SHA256SUMS
+          sha256sum --check SHA256SUMS
+          tar -xzf "$WHISPER_MODELS"
+          tar -xzf "$PIPER_MODELS"
+          rm "$WHISPER_MODELS" "$PIPER_MODELS" SHA256SUMS
+
+      - name: Verify model files
+        run: |
+          required=(
+            whisper/model/whisper_encoder_base_20s.rknn
+            whisper/model/whisper_decoder_base_20s.rknn
+            whisper/model/mel_80_filters.txt
+            whisper/model/vocab_en.txt
+            whisper/model/vocab_zh.txt
+            piper/model/encoder.onnx
+            piper/model/decoder_rk3576.rknn
+            piper/model/config.json
+          )
+          for file in "${required[@]}"; do
+            [[ -s "$file" ]] || { echo "Missing model file: $file"; exit 1; }
+          done
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate Whisper metadata
+        id: whisper-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.WHISPER_IMAGE }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha,prefix=sha-
+
+      - name: Build and publish Whisper
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: whisper/Dockerfile
+          platforms: linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.whisper-meta.outputs.tags }}
+          labels: ${{ steps.whisper-meta.outputs.labels }}
+          cache-from: type=gha,scope=whisper
+          cache-to: type=gha,mode=max,scope=whisper
+          provenance: true
+          sbom: true
+
+      - name: Generate Piper metadata
+        id: piper-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.PIPER_IMAGE }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha,prefix=sha-
+
+      - name: Build and publish Piper
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: piper/Dockerfile
+          platforms: linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.piper-meta.outputs.tags }}
+          labels: ${{ steps.piper-meta.outputs.labels }}
+          cache-from: type=gha,scope=piper
+          cache-to: type=gha,mode=max,scope=piper
+          provenance: true
+          sbom: true

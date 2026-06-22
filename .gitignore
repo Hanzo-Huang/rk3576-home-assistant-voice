@@ -1,0 +1,30 @@
+# OS and editors
+.DS_Store
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/
+
+# Local configuration and logs
+.env
+.env.*
+!.env.example
+*.log
+
+# Generated Home Assistant state
+homeassistant/config/
+
+# Release artifacts are uploaded to GitHub Releases
+dist/
+
+# Models are downloaded from the models-v1 release during image builds
+piper/model/*
+!piper/model/README.md
+whisper/model/*
+!whisper/model/README.md

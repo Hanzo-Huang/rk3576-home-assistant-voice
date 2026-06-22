@@ -1,0 +1,4 @@
+wyoming
+numpy
+onnxruntime
+piper-tts
