@@ -7,6 +7,7 @@ import io
 import json
 import logging
 import math
+import time
 import wave
 from functools import partial
 from pathlib import Path
@@ -237,14 +238,18 @@ class RknpuPiperEventHandler(AsyncEventHandler):
 
         _LOGGER.info("Synthesizing text: %s", text)
         syn_config = self._make_synthesis_config(synthesize)
+        synth_start_time = time.perf_counter()
         wav_bytes = await asyncio.to_thread(synthesize_wav_bytes, self.voice, text, syn_config)
+        synth_elapsed_ms = (time.perf_counter() - synth_start_time) * 1000
 
         with wave.open(io.BytesIO(wav_bytes), "rb") as wav_file:
             rate = wav_file.getframerate()
             width = wav_file.getsampwidth()
             channels = wav_file.getnchannels()
+            audio_seconds = wav_file.getnframes() / max(1, rate)
             audio_bytes = wav_file.readframes(wav_file.getnframes())
 
+        stream_start_time = time.perf_counter()
         await self.write_event(AudioStart(rate=rate, width=width, channels=channels).event())
 
         bytes_per_sample = width * channels
@@ -256,6 +261,18 @@ class RknpuPiperEventHandler(AsyncEventHandler):
             await self.write_event(AudioChunk(audio=chunk, rate=rate, width=width, channels=channels).event())
 
         await self.write_event(AudioStop().event())
+        total_elapsed_ms = (time.perf_counter() - synth_start_time) * 1000
+        stream_elapsed_ms = (time.perf_counter() - stream_start_time) * 1000
+        realtime_factor = synth_elapsed_ms / max(1.0, audio_seconds * 1000)
+        _LOGGER.info(
+            "TTS latency: synth=%.0f ms stream=%.0f ms total=%.0f ms audio=%.2f sec realtime_factor=%.2fx chunks=%s",
+            synth_elapsed_ms,
+            stream_elapsed_ms,
+            total_elapsed_ms,
+            audio_seconds,
+            realtime_factor,
+            num_chunks,
+        )
 
     def _make_synthesis_config(self, synthesize: Synthesize) -> SynthesisConfig:
         syn_config = SynthesisConfig()

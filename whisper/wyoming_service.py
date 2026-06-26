@@ -5,6 +5,7 @@ import argparse
 import asyncio
 import base64
 import logging
+import time
 from functools import partial
 from pathlib import Path
 
@@ -179,14 +180,16 @@ class RknpuWhisperEventHandler(AsyncEventHandler):
                 await self.write_event(Transcript(text="").event())
                 return True
 
+            audio_seconds = len(self.audio) / max(1, self.rate * self.width * self.channels)
             _LOGGER.info(
                 "Transcribing %.2f sec audio: rate=%s width=%s channels=%s",
-                len(self.audio) / max(1, self.rate * self.width * self.channels),
+                audio_seconds,
                 self.rate,
                 self.width,
                 self.channels,
             )
 
+            start_time = time.perf_counter()
             try:
                 text = await asyncio.to_thread(
                     self.model.transcribe_pcm,
@@ -199,6 +202,14 @@ class RknpuWhisperEventHandler(AsyncEventHandler):
                 _LOGGER.exception("Transcription failed")
                 text = ""
 
+            elapsed_ms = (time.perf_counter() - start_time) * 1000
+            realtime_factor = elapsed_ms / max(1.0, audio_seconds * 1000)
+            _LOGGER.info(
+                "STT latency: %.0f ms for %.2f sec audio, realtime_factor=%.2fx",
+                elapsed_ms,
+                audio_seconds,
+                realtime_factor,
+            )
             _LOGGER.info("Transcript: %s", text)
             await self.write_event(Transcript(text=text).event())
             self.audio.clear()
