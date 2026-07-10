@@ -63,6 +63,31 @@ The compose stack exposes these local services:
 | openWakeWord | Wake-word detection | `10400` |
 | RKLLM API | Local LLM, OpenAI-compatible API | `8001` |
 
+## Performance
+
+Tested model stack:
+
+- 🎙️ **STT:** Whisper
+- 🧠 **LLM:** Qwen2.5-1.5B-Instruct
+- 🔊 **TTS:** Piper (Amy Medium)
+
+All three models are accelerated by the RK3576 NPU.
+
+Tested LLM configurations:
+
+| Model | Quantization | LLM RAM usage |
+| --- | --- | ---: |
+| Qwen2.5-1.5B-Instruct | W4A16 | ~1.5 GB |
+| Qwen2.5-3B-Instruct | W4A16 | ~2.5 GB |
+
+Performance with **Qwen2.5-1.5B-Instruct (W4A16)**:
+
+| Stage | Time |
+| --- | ---: |
+| 🎙️ Whisper transcription | 0.626 s |
+| 🧠 LLM response | 2.82 s |
+| 🔊 Piper (Amy Medium) synthesis | 0.474 s |
+
 ## Configure Home Assistant
 
 ### 1. Add the Wyoming services
@@ -275,3 +300,10 @@ The model assets are intentionally not committed to the repository. See the mode
 - [openWakeWord](https://github.com/dscripka/openWakeWord)
 - [Local LLM integration for Home Assistant](https://github.com/acon96/home-llm)
 - [RKLLM Docker images](https://github.com/hanzo-huang/rkllm-docker)
+
+## Acknowledgements
+
+Thanks to:
+
+- [airockchip/rknn_model_zoo](https://github.com/airockchip/rknn_model_zoo) for the Whisper RKNN model source used by this project.
+- [danielferr85/piper-voices-rknn](https://huggingface.co/danielferr85/piper-voices-rknn) for the Piper voices RKNN model used by this project.
