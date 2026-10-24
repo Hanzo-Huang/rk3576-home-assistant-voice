@@ -318,6 +318,22 @@ Model name: rkllm-model
 
 The Whisper and Piper images are built by GitHub Actions for Linux ARM64.
 
+The services have separate workflows: **Build Whisper image** and **Build Piper images**.
+To build only Chinese Piper, open **Actions -> Build Piper images -> Run workflow**
+and set **voice** to `zh-cn-huayan-medium`. Use `en-us-amy-medium` for English,
+or `all` to build every voice in the catalog. An unknown voice tag fails before
+any image build starts.
+
+The same selection works through the GitHub CLI:
+
+```bash
+gh workflow run build-piper.yml -f voice=zh-cn-huayan-medium
+```
+
+Automatic push and pull request builds run for changes to the corresponding
+service, shared runtime, or workflow. Version tags build both services and all
+Piper voices. Manual Piper builds do not require a Whisper model release.
+
 Piper model files stay on [Hugging Face](https://huggingface.co/buckets/HanzoHuang/piper-voices-rknn-bucket/tree). The Piper Dockerfile downloads and includes only the selected voice's three inference files: `encoder.onnx`, `decoder_rk3576.rknn`, and `config.json`. Other decoders, training checkpoints, datasets, and training scripts are not downloaded. No model release bundle or local model download is needed.
 
 To add a Piper voice, append an entry to [`piper/models.json`](piper/models.json):

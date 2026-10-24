@@ -1,0 +1,118 @@
+name: Build Piper images
+
+on:
+  push:
+    branches: [main, master]
+    tags: ["v*"]
+    paths:
+      - piper/**
+      - runtime/**
+      - .dockerignore
+      - .github/workflows/build-piper.yml
+  pull_request:
+    branches: [main, master]
+    paths:
+      - piper/**
+      - runtime/**
+      - .dockerignore
+      - .github/workflows/build-piper.yml
+  workflow_dispatch:
+    inputs:
+      voice:
+        description: Voice image tag from piper/models.json (or all)
+        type: string
+        required: true
+        default: all
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: build-piper-${{ github.ref }}-${{ inputs.voice || 'all' }}
+  cancel-in-progress: true
+
+env:
+  PIPER_IMAGE: ghcr.io/hanzo-huang/wyoming-piper-rk3576
+
+jobs:
+  piper-models:
+    name: Read Piper model catalog
+    runs-on: ubuntu-latest
+    outputs:
+      models: ${{ steps.catalog.outputs.models }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read model catalog
+        id: catalog
+        env:
+          SELECTED_VOICE: ${{ inputs.voice || 'all' }}
+        run: |
+          models=$(jq -c --arg voice "$SELECTED_VOICE" \
+            'if $voice == "all" then . else map(select(.tag == $voice)) end' \
+            piper/models.json)
+          if ! jq -e 'length > 0' <<< "$models" > /dev/null; then
+            echo "::error::Unknown Piper voice tag: $SELECTED_VOICE. Choose a tag from piper/models.json or use all."
+            exit 1
+          fi
+          echo "models=$models" >> "$GITHUB_OUTPUT"
+
+  piper:
+    name: Build Piper (${{ matrix.model.voice }})
+    needs: piper-models
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        model: ${{ fromJSON(needs.piper-models.outputs.models) }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate Piper metadata
+        id: piper-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.PIPER_IMAGE }}
+          flavor: |
+            latest=false
+          tags: |
+            type=raw,value=${{ matrix.model.tag }},enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ matrix.model.default && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+            type=ref,event=branch,suffix=-${{ matrix.model.tag }}
+            type=ref,event=tag,suffix=-${{ matrix.model.tag }}
+            type=sha,prefix=sha-,suffix=-${{ matrix.model.tag }}
+            type=ref,event=branch,enable=${{ matrix.model.default }}
+            type=ref,event=tag,enable=${{ matrix.model.default }}
+            type=sha,prefix=sha-,enable=${{ matrix.model.default }}
+
+      - name: Build and publish Piper
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: piper/Dockerfile
+          platforms: linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          build-args: |
+            PIPER_MODEL_URL=${{ matrix.model.url }}
+            PIPER_VOICE=${{ matrix.model.voice }}
+          tags: ${{ steps.piper-meta.outputs.tags }}
+          labels: ${{ steps.piper-meta.outputs.labels }}
+          cache-from: type=gha,scope=piper-${{ matrix.model.tag }}
+          cache-to: type=gha,mode=max,scope=piper-${{ matrix.model.tag }}
+          provenance: true
+          sbom: true
