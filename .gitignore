@@ -23,7 +23,7 @@ homeassistant/config/
 # Release artifacts are uploaded to GitHub Releases
 dist/
 
-# Models are downloaded from the models-v1 release during image builds
+# Model assets stay outside Git; Piper downloads from Hugging Face during builds
 piper/model/*
 !piper/model/README.md
 whisper/model/*

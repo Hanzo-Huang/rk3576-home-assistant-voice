@@ -1,3 +1,9 @@
+FROM --platform=$BUILDPLATFORM python:3.11-slim-bookworm AS models
+
+ARG PIPER_MODEL_URL=https://huggingface.co/buckets/HanzoHuang/piper-voices-rknn-bucket/resolve/en/en_US/amy/medium
+COPY piper/download_model.py /download_model.py
+RUN python /download_model.py --url "$PIPER_MODEL_URL" --output /model
+
 FROM python:3.11-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 \
@@ -27,7 +33,12 @@ RUN python -m pip install --upgrade pip \
     && rm -f /tmp/rknn_toolkit_lite2-2.3.2-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl
 
 COPY piper/wyoming_service.py /app/wyoming_service.py
-COPY piper/model /app/model
+COPY --from=models /model/encoder.onnx /app/model/encoder.onnx
+COPY --from=models /model/decoder_rk3576.rknn /app/model/decoder_rk3576.rknn
+COPY --from=models /model/config.json /app/model/config.json
+
+ARG PIPER_VOICE=en_US-amy-medium
+ENV PIPER_VOICE=$PIPER_VOICE
 
 EXPOSE 10200
 

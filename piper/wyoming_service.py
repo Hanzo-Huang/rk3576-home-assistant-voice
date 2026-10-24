@@ -7,6 +7,7 @@ import io
 import json
 import logging
 import math
+import os
 import time
 import wave
 from functools import partial
@@ -396,7 +397,10 @@ def normalize_text(text: str, auto_punctuation: str) -> str:
 
 
 def build_info(voice: PiperVoiceRKNN, voice_name: str, model_dir: Path, no_streaming: bool) -> Info:
-    language = getattr(voice.config, "espeak_voice", None) or voice_name.split("_")[0].split("-")[0]
+    # Standard Piper names carry the locale; eSpeak uses "cmn" for Mandarin.
+    language = voice_name.split("-")[0]
+    if "_" not in language:
+        language = getattr(voice.config, "espeak_voice", None) or language
     speakers = None
     speaker_id_map = getattr(voice.config, "speaker_id_map", None)
     if speaker_id_map:
@@ -431,7 +435,7 @@ async def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--uri", default=DEFAULT_URI)
     parser.add_argument("--model-dir", default=str(DEFAULT_MODEL_DIR))
-    parser.add_argument("--voice", default="piper-rknn")
+    parser.add_argument("--voice", default=os.environ.get("PIPER_VOICE", "piper-rknn"))
     parser.add_argument("--speaker")
     parser.add_argument("--samples-per-chunk", type=int, default=DEFAULT_SAMPLES_PER_CHUNK)
     parser.add_argument("--auto-punctuation", default=".?!。？！．؟")

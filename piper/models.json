@@ -1,0 +1,14 @@
+[
+  {
+    "voice": "en_US-amy-medium",
+    "tag": "en-us-amy-medium",
+    "url": "https://huggingface.co/buckets/HanzoHuang/piper-voices-rknn-bucket/resolve/en/en_US/amy/medium",
+    "default": true
+  },
+  {
+    "voice": "zh_CN-huayan-medium",
+    "tag": "zh-cn-huayan-medium",
+    "url": "https://huggingface.co/buckets/HanzoHuang/piper-voices-rknn-bucket/resolve/zh/zh_CN/huayan/medium",
+    "default": false
+  }
+]
